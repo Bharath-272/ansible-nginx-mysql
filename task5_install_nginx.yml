@@ -1,0 +1,77 @@
+---
+- name: Install and Configure Nginx and MySQL
+  hosts: webservers
+  become: yes
+
+  vars:
+    mysql_db: webapp_db
+    mysql_user: webapp_user
+    mysql_password: "Secure@123"
+
+  tasks:
+
+    # -------------------
+    # NGINX
+    # -------------------
+
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+        update_cache: yes
+
+    - name: Start and enable Nginx
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Deploy static website
+      copy:
+        src: files/index.html
+        dest: /var/www/html/index.html
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    # -------------------
+    # MYSQL
+    # -------------------
+
+    - name: Install MySQL Server and PyMySQL
+      apt:
+        name:
+          - mysql-server
+          - python3-pymysql
+        state: present
+        update_cache: yes
+
+    - name: Start and enable MySQL
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+
+    - name: Create MySQL database
+      community.mysql.mysql_db:
+        name: "{{ mysql_db }}"
+        state: present
+
+    - name: Create MySQL user
+      community.mysql.mysql_user:
+        name: "{{ mysql_user }}"
+        password: "{{ mysql_password | password_hash('sha512') }}"
+        priv: "{{ mysql_db }}.*:ALL"
+        state: present
+
+    # -------------------
+    # Verification
+    # -------------------
+
+    - name: Show databases
+      command: mysql -u root -e "SHOW DATABASES;"
+      register: mysql_output
+
+    - name: Print database list
+      debug:
+        var: mysql_output.stdout_lines
